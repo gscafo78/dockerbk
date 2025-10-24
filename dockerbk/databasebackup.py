@@ -9,33 +9,35 @@ class DatabaseBackup:
     """
     Class for managing database backups in Docker containers.
     """
+    def __init__(self, logger=None):
+        self.logger = logger or logging.getLogger(self.__class__.__name__)
     # Define database type constants for supported database systems
     MYSQL = "MySQL"
     MARIADB = "MariaDB"
     POSTGRESQL = "PostgreSQL"
     MONGODB = "MongoDB"
 
-    @staticmethod
-    def stop_containers_with_suffix(suffix, exclude_container):
-        """
-        Stops all containers that start with the suffix, excluding the passed one.
-        Returns the list of stopped containers.
-        """
-        # Run docker ps to get list of running container names
-        result = subprocess.run(
-            ["docker", "ps", "--format", "{{.Names}}"],
-            stdout=subprocess.PIPE,
-            text=True,
-            check=True
-        )
-        # Split output into list of container names
-        containers = result.stdout.strip().split('\n')
-        # Filter containers that start with the suffix but exclude the specified container
-        to_stop = [c for c in containers if c.startswith(suffix) and c != exclude_container]
-        # Stop each filtered container
-        for name in to_stop:
-            subprocess.run(["docker", "stop", name], check=True)
-        return to_stop
+    # @staticmethod
+    # def stop_containers_with_suffix(suffix, exclude_container):
+    #     """
+    #     Stops all containers that start with the suffix, excluding the passed one.
+    #     Returns the list of stopped containers.
+    #     """
+    #     # Run docker ps to get list of running container names
+    #     result = subprocess.run(
+    #         ["docker", "ps", "--format", "{{.Names}}"],
+    #         stdout=subprocess.PIPE,
+    #         text=True,
+    #         check=True
+    #     )
+    #     # Split output into list of container names
+    #     containers = result.stdout.strip().split('\n')
+    #     # Filter containers that start with the suffix but exclude the specified container
+    #     to_stop = [c for c in containers if c.startswith(suffix) and c != exclude_container]
+    #     # Stop each filtered container
+    #     for name in to_stop:
+    #         subprocess.run(["docker", "stop", name], check=True)
+    #     return to_stop
 
     @staticmethod
     def is_mariadb_version_below_11(version):
@@ -230,13 +232,13 @@ class DatabaseBackup:
         for name in container_list:
             subprocess.run(["docker", "start", name], check=True)
 
-    @staticmethod
-    def manage_backup(container_name,
+    def manage_backup(self, container_name,
                       db_type,
                       path="."):
         """
         Performs database backup for the specified container and type.
         """
+        log = self.logger
         # Determine backup file name based on database type
         if db_type in (DatabaseBackup.MYSQL, DatabaseBackup.MARIADB, DatabaseBackup.POSTGRESQL):
             backup_file = f"{container_name}_{db_type}_backup.sql"
@@ -245,14 +247,14 @@ class DatabaseBackup:
         else:
             raise ValueError(f"Unsupported db_type: {db_type}")
         # Log the backup operation
-        logger.info(f"Performing backup to {path}/{backup_file}...")
+        log.info(f"Performing backup of {db_type} database in container {container_name} to {path}/{backup_file}...")
         tmp_filename = f"{path}/{backup_file}"
         # Perform the backup
         ok = DatabaseBackup.backup_database(container_name, db_type, tmp_filename)
         if ok:
-            logger.info("Backup completed.")
+            log.info("Database backup completed successfully.")
         else:
-            logger.error("Backup failed.")
+            log.error("Database backup failed.")
             raise RuntimeError("Backup failed")
 
     @staticmethod

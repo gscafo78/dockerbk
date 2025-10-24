@@ -24,12 +24,12 @@ if __name__ == "__main__":
         version=f"%(prog)s {__version__}",
         help="Show program version and exit.",
     )
-    # parser.add_argument(
-    #     "-c", "--config",
-    #     dest="config_path",
-    #     default="./settings.json",
-    #     help="Path to configuration file (default: ./settings.json)",
-    # )
+    parser.add_argument(
+        "-d", "--directory",
+        dest="backup_path",
+        default=".",
+        help="Path to backup files (default: .)",
+    )
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -45,21 +45,27 @@ if __name__ == "__main__":
     # Start with DEBUG if requested, otherwise INFO
     logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     log = logger or logging.getLogger(__name__)
-    containers = Container()
+    containers = Container(logger=log)
+    dbbackup = DatabaseBackup(logger=log)
     containers_list = containers.get_running_containers()
     if not containers_list:
         print("No running containers found.")
 
+    containers.stop_containers(db=False)
     for name in containers_list:
         is_db, db_type = containers.verify_database_type_from_image(name)
         if is_db:
             log.info(f"Container: {name}, DB Type: {db_type}")
             try:
-                DatabaseBackup.manage_backup(name, db_type, "/opt/dockerbk/dockerbk/backups")
+                dbbackup.manage_backup(name, db_type, args.backup_path)
             except Exception as e:
                 logger.error(f"Backup failed: {e}")
-                # sys.exit(1)
-
         else:
-            log.info(f"Container: {name} is not a supported database.")
+            log.debug(f"Container: {name} is not a supported database.")
+
+    containers.stop_containers(db=True)
+    log.info("Creating Docker volumes backup tar.gz...")
+    containers.create_tar_gz(args.backup_path)
+    containers.start_containers(db=True)
+    containers.start_containers(db=False)
 
