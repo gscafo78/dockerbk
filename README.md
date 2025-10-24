@@ -111,7 +111,7 @@ To contribute to this project:
 
 ## License
 
-[Specify license here, e.g., MIT License]
+[GNU GENERAL PUBLIC LICENSE Version 3]
 
 ## Version
 
